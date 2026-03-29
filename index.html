@@ -6,17 +6,9 @@
 <title>Instagram 相互フォローチェッカー</title>
 <style>
   :root {
-    --bg: #0f0f0f;
-    --surface: #1a1a1a;
-    --surface2: #242424;
-    --border: #2e2e2e;
-    --accent: #e1306c;
-    --accent2: #833ab4;
-    --text: #f0f0f0;
-    --muted: #888;
-    --official: #1d9bf0;
-    --green: #3ecf8e;
-    --radius: 12px;
+    --bg: #0f0f0f; --surface: #1a1a1a; --surface2: #242424; --border: #2e2e2e;
+    --accent: #e1306c; --accent2: #833ab4; --text: #f0f0f0; --muted: #888;
+    --official: #1d9bf0; --green: #3ecf8e; --radius: 12px;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
@@ -152,25 +144,18 @@
   <table>
     <thead>
       <tr>
-        <th>#</th>
-        <th>アカウント</th>
+        <th>#</th><th>アカウント</th>
         <th onclick="toggleSort('followers')" id="thFollowers">フォロワー数 <span class="sort-arrow">↕</span></th>
-        <th>フォロー日</th>
-        <th>公式</th>
-        <th>プロフィール</th>
+        <th>フォロー日</th><th>公式</th><th>プロフィール</th>
       </tr>
     </thead>
     <tbody id="tableBody"></tbody>
   </table>
 </div>
 <script>
-let followersData = null;
-let followingData = null;
-let results = [];
-let officialSet = new Set();
-let followerCounts = {};
-let currentFilter = 'all';
-let sortKey = 'followers_desc';
+let followersData = null, followingData = null, results = [];
+let officialSet = new Set(), followerCounts = {};
+let currentFilter = 'all', sortKey = 'followers_desc';
 
 function setupUpload(inputId, boxId, infoId, label) {
   const input = document.getElementById(inputId);
@@ -187,25 +172,18 @@ function setupUpload(inputId, boxId, infoId, label) {
         if (users.length === 0) {
           info.textContent = '⚠ 0件：ファイル形式を確認してください';
           info.style.color = '#fcaf45';
-          box.classList.remove('loaded');
-          box.style.borderColor = '#fcaf45';
-          if (label === 'followers') followersData = null;
-          else followingData = null;
+          box.classList.remove('loaded'); box.style.borderColor = '#fcaf45';
+          if (label === 'followers') followersData = null; else followingData = null;
         } else {
-          if (label === 'followers') followersData = users;
-          else followingData = users;
+          if (label === 'followers') followersData = users; else followingData = users;
           info.textContent = `✓ ${users.length}件 読み込み完了`;
-          info.style.color = '';
-          box.classList.add('loaded');
-          box.style.borderColor = '';
+          info.style.color = ''; box.classList.add('loaded'); box.style.borderColor = '';
         }
         checkReady();
       } catch(err) {
-        info.textContent = '× JSONファイルとして読み込めません';
-        info.style.color = '#ff6b6b';
-        box.classList.remove('loaded');
-        if (label === 'followers') followersData = null;
-        else followingData = null;
+        info.textContent = '× JSONとして読み込めません: ' + err.message;
+        info.style.color = '#ff6b6b'; box.classList.remove('loaded');
+        if (label === 'followers') followersData = null; else followingData = null;
         checkReady();
       }
     };
@@ -214,84 +192,80 @@ function setupUpload(inputId, boxId, infoId, label) {
   box.addEventListener('dragover', e => { e.preventDefault(); box.classList.add('drag-over'); });
   box.addEventListener('dragleave', () => box.classList.remove('drag-over'));
   box.addEventListener('drop', e => {
-    e.preventDefault();
-    box.classList.remove('drag-over');
+    e.preventDefault(); box.classList.remove('drag-over');
     const file = e.dataTransfer.files[0];
-    if (file) {
-      const dt = new DataTransfer();
-      dt.items.add(file);
-      input.files = dt.files;
-      input.dispatchEvent(new Event('change'));
-    }
+    if (file) { const dt = new DataTransfer(); dt.items.add(file); input.files = dt.files; input.dispatchEvent(new Event('change')); }
   });
+}
+
+function toUser(d) {
+  const name = d.value || d.username || d.name || '';
+  if (!name) return null;
+  return { username: name, href: d.href || ('https://www.instagram.com/' + name + '/'), timestamp: d.timestamp || d.time || 0 };
 }
 
 function extractUsers(arr) {
-  return arr.flatMap(item => {
+  const results = [];
+  for (const item of arr) {
     const list = item.string_list_data || item.stringListData || [];
-    return list.map(d => ({
-      username: d.value || d.username || '',
-      href: d.href || ('https://www.instagram.com/' + (d.value || '')),
-      timestamp: d.timestamp || 0
-    })).filter(u => u.username);
-  });
+    if (list.length > 0) {
+      // title にユーザー名がある新形式: { title: "username", string_list_data: [{ href, timestamp }] }
+      const nameFromTitle = item.title || '';
+      for (const d of list) {
+        const name = d.value || d.username || nameFromTitle || '';
+        if (!name) continue;
+        results.push({
+          username: name,
+          href: d.href || ('https://www.instagram.com/' + name + '/'),
+          timestamp: d.timestamp || d.time || 0
+        });
+      }
+      continue;
+    }
+    const u = toUser(item);
+    if (u) results.push(u);
+  }
+  return results;
 }
 
 function deepFindUsers(obj, depth) {
-  if (depth > 6) return [];
+  if (depth > 8) return [];
   if (Array.isArray(obj)) {
+    if (obj.length === 0) return [];
     const r = extractUsers(obj);
     if (r.length > 0) return r;
-    for (const item of obj) {
-      const r2 = deepFindUsers(item, depth + 1);
-      if (r2.length > 0) return r2;
-    }
+    for (const item of obj) { const r2 = deepFindUsers(item, depth + 1); if (r2.length > 0) return r2; }
     return [];
   }
   if (obj && typeof obj === 'object') {
-    const priority = ['relationships_following', 'relationships_followers',
-                      'relationships_follow_requests_sent'];
-    for (const k of priority) {
-      if (obj[k]) {
-        const r = deepFindUsers(obj[k], depth + 1);
-        if (r.length > 0) return r;
-      }
-    }
-    for (const k of Object.keys(obj)) {
-      if (priority.includes(k)) continue;
-      const r = deepFindUsers(obj[k], depth + 1);
-      if (r.length > 0) return r;
-    }
+    const priority = ['relationships_following','relationships_followers','relationships_follow_requests_sent'];
+    for (const k of priority) { if (obj[k]) { const r = deepFindUsers(obj[k], depth+1); if (r.length > 0) return r; } }
+    for (const k of Object.keys(obj)) { if (priority.includes(k)) continue; const r = deepFindUsers(obj[k], depth+1); if (r.length > 0) return r; }
   }
   return [];
 }
 
-function parseInstagramJSON(json, type) {
-  return deepFindUsers(json, 0);
-}
+function parseInstagramJSON(json, type) { return deepFindUsers(json, 0); }
 
 function checkReady() {
-  const ready = followersData && followersData.length > 0
-             && followingData && followingData.length > 0;
-  document.getElementById('analyzeBtn').disabled = !ready;
+  document.getElementById('analyzeBtn').disabled = !(followersData?.length > 0 && followingData?.length > 0);
 }
 
-setupUpload('followersFile', 'followersBox', 'followersInfo', 'followers');
-setupUpload('followingFile', 'followingBox', 'followingInfo', 'following');
+setupUpload('followersFile','followersBox','followersInfo','followers');
+setupUpload('followingFile','followingBox','followingInfo','following');
 document.getElementById('analyzeBtn').addEventListener('click', analyze);
 document.getElementById('searchInput').addEventListener('input', renderTable);
 document.getElementById('sortSelect').addEventListener('change', e => { sortKey = e.target.value; renderTable(); });
 
 function analyze() {
   const followerSet = new Set(followersData.map(u => u.username.toLowerCase()));
-  const notFollowingBack = followingData.filter(u => !followerSet.has(u.username.toLowerCase()));
-  results = notFollowingBack;
+  results = followingData.filter(u => !followerSet.has(u.username.toLowerCase()));
   document.getElementById('statsBar').style.display = 'grid';
   document.getElementById('toolbar').style.display = 'flex';
   document.getElementById('tableWrap').style.display = 'block';
   document.getElementById('statFollowing').textContent = followingData.length.toLocaleString();
   document.getElementById('statFollowers').textContent = followersData.length.toLocaleString();
-  document.getElementById('statNotBack').textContent = notFollowingBack.length.toLocaleString();
+  document.getElementById('statNotBack').textContent = results.length.toLocaleString();
   setFilter('all');
   setTimeout(() => {
     const el = document.getElementById('statsBar');
@@ -303,94 +277,65 @@ function analyze() {
 function setFilter(f) {
   currentFilter = f;
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById(f === 'all' ? 'filterAll' : f === 'official' ? 'filterOfficial' : 'filterNonOfficial').classList.add('active');
+  document.getElementById(f==='all'?'filterAll':f==='official'?'filterOfficial':'filterNonOfficial').classList.add('active');
   renderTable();
 }
-
 function toggleSort(key) {
-  if (sortKey === `${key}_desc`) sortKey = `${key}_asc`;
-  else sortKey = `${key}_desc`;
+  sortKey = sortKey===`${key}_desc`?`${key}_asc`:`${key}_desc`;
   document.getElementById('sortSelect').value = sortKey;
   renderTable();
 }
-
 function toggleOfficial(username) {
-  if (officialSet.has(username)) officialSet.delete(username);
-  else officialSet.add(username);
+  if (officialSet.has(username)) officialSet.delete(username); else officialSet.add(username);
   document.getElementById('statOfficial').textContent = officialSet.size.toLocaleString();
   renderTable();
 }
-
 function onFollowerInput(username, val) {
-  const num = parseInt(val.replace(/,/g, ''), 10);
+  const num = parseInt(val.replace(/,/g,''), 10);
   followerCounts[username] = isNaN(num) ? -1 : num;
   if (sortKey.startsWith('followers')) renderTable();
 }
-
-function formatCount(n) {
-  if (n >= 1000000) return (n/1000000).toFixed(1) + 'M';
-  if (n >= 1000) return (n/1000).toFixed(1) + 'K';
-  return n.toString();
-}
-
 function formatDate(ts) {
   if (!ts) return '—';
-  const d = new Date(ts * 1000);
-  return d.toLocaleDateString('ja-JP', { year: 'numeric', month: 'short', day: 'numeric' });
+  return new Date(ts*1000).toLocaleDateString('ja-JP',{year:'numeric',month:'short',day:'numeric'});
 }
-
 function renderTable() {
   const search = document.getElementById('searchInput').value.toLowerCase();
   let filtered = results.filter(u => {
     if (search && !u.username.toLowerCase().includes(search)) return false;
-    if (currentFilter === 'official' && !officialSet.has(u.username)) return false;
-    if (currentFilter === 'non_official' && officialSet.has(u.username)) return false;
+    if (currentFilter==='official' && !officialSet.has(u.username)) return false;
+    if (currentFilter==='non_official' && officialSet.has(u.username)) return false;
     return true;
   });
-  filtered.sort((a, b) => {
-    if (sortKey === 'followers_desc') return (followerCounts[b.username] ?? -1) - (followerCounts[a.username] ?? -1);
-    if (sortKey === 'followers_asc') return (followerCounts[a.username] ?? Infinity) - (followerCounts[b.username] ?? Infinity);
-    if (sortKey === 'date_desc') return (b.timestamp || 0) - (a.timestamp || 0);
-    if (sortKey === 'date_asc') return (a.timestamp || 0) - (b.timestamp || 0);
-    if (sortKey === 'name_asc') return a.username.localeCompare(b.username);
+  filtered.sort((a,b) => {
+    if (sortKey==='followers_desc') return (followerCounts[b.username]??-1)-(followerCounts[a.username]??-1);
+    if (sortKey==='followers_asc') return (followerCounts[a.username]??Infinity)-(followerCounts[b.username]??Infinity);
+    if (sortKey==='date_desc') return (b.timestamp||0)-(a.timestamp||0);
+    if (sortKey==='date_asc') return (a.timestamp||0)-(b.timestamp||0);
+    if (sortKey==='name_asc') return a.username.localeCompare(b.username);
     return 0;
   });
   document.getElementById('resultCount').textContent = `${filtered.length} 件表示`;
   const tbody = document.getElementById('tableBody');
-  if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="6"><div class="empty"><div class="icon">🔍</div><p>該当するアカウントがありません</p></div></td></tr>`;
-    return;
-  }
-  tbody.innerHTML = filtered.map((u, i) => {
-    const isOfficial = officialSet.has(u.username);
+  if (filtered.length===0) { tbody.innerHTML=`<tr><td colspan="6"><div class="empty"><div class="icon">🔍</div><p>該当するアカウントがありません</p></div></td></tr>`; return; }
+  tbody.innerHTML = filtered.map((u,i) => {
+    const isOff = officialSet.has(u.username);
     const fc = followerCounts[u.username];
-    const initial = u.username.charAt(0).toUpperCase();
-    const officialBadge = isOfficial ? '<span class="badge-official">公式</span>' : '';
-    return `
-    <tr>
-      <td class="rank">${i + 1}</td>
-      <td><div class="user-cell"><div class="avatar">${initial}</div><div>
-        <div class="username">${escapeHtml(u.username)} ${officialBadge}</div>
+    return `<tr>
+      <td class="rank">${i+1}</td>
+      <td><div class="user-cell"><div class="avatar">${u.username.charAt(0).toUpperCase()}</div><div>
+        <div class="username">${escapeHtml(u.username)}${isOff?' <span class="badge-official">公式</span>':''}</div>
         <div class="followed-date">${formatDate(u.timestamp)} からフォロー</div>
       </div></div></td>
-      <td><input class="followers-input" type="text" placeholder="例: 12000"
-        value="${fc !== undefined && fc >= 0 ? fc : ''}"
-        oninput="onFollowerInput('${escapeAttr(u.username)}', this.value)"></td>
+      <td><input class="followers-input" type="text" placeholder="例: 12000" value="${fc!==undefined&&fc>=0?fc:''}" oninput="onFollowerInput('${escapeAttr(u.username)}',this.value)"></td>
       <td style="color:var(--muted);font-size:12px;">${formatDate(u.timestamp)}</td>
-      <td><button class="official-toggle ${isOfficial ? 'on' : ''}"
-        onclick="toggleOfficial('${escapeAttr(u.username)}')"
-        title="${isOfficial ? '公式マークを外す' : '公式としてマーク'}">✓</button></td>
+      <td><button class="official-toggle ${isOff?'on':''}" onclick="toggleOfficial('${escapeAttr(u.username)}')" title="${isOff?'公式マークを外す':'公式としてマーク'}">✓</button></td>
       <td><a href="${escapeHtml(u.href)}" target="_blank" rel="noopener" class="ig-link">開く</a></td>
     </tr>`;
   }).join('');
 }
-
-function escapeHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-function escapeAttr(s) {
-  return String(s).replace(/'/g, "\\'");
-}
+function escapeHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function escapeAttr(s) { return String(s).replace(/'/g,"\\'"); }
 </script>
 </body>
 </html>
