@@ -32,11 +32,13 @@
   .upload-box h3 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
   .upload-box p { font-size: 12px; color: var(--muted); }
   .upload-box .loaded-info { font-size: 12px; color: var(--green); font-weight: 600; margin-top: 6px; }
-  .analyze-btn { display: block; width: 100%; padding: 14px; background: linear-gradient(135deg, #833ab4, #e1306c); color: #fff; border: none; border-radius: var(--radius); font-size: 15px; font-weight: 700; cursor: pointer; transition: opacity 0.2s; letter-spacing: 0.3px; }
+  .analyze-btn { display: block; width: 100%; padding: 14px; background: linear-gradient(135deg, #833ab4, #e1306c); color: #fff; border: none; border-radius: var(--radius); font-size: 15px; font-weight: 700; cursor: pointer; transition: opacity 0.2s; }
   .analyze-btn:hover { opacity: 0.9; }
   .analyze-btn:disabled { opacity: 0.4; cursor: not-allowed; }
   .stats-bar { display: none; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; padding: 0 24px 20px; max-width: 900px; margin: 0 auto; }
-  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; text-align: center; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; text-align: center; transition: opacity 0.2s; }
+  .stat-card.clickable { cursor: pointer; }
+  .stat-card.clickable:hover { opacity: 0.8; }
   .stat-card .num { font-size: 28px; font-weight: 800; }
   .stat-card .label { font-size: 11px; color: var(--muted); margin-top: 2px; }
   .stat-card.red .num { color: var(--accent); }
@@ -47,7 +49,6 @@
   .toolbar input[type="text"] { flex: 1; min-width: 200px; padding: 9px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13px; }
   .toolbar input[type="text"]:focus { outline: none; border-color: var(--accent); }
   .toolbar select { padding: 9px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13px; cursor: pointer; }
-  .toolbar select:focus { outline: none; border-color: var(--accent); }
   .filter-btn { padding: 9px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--muted); font-size: 12px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
   .filter-btn.active { background: rgba(225,48,108,0.15); border-color: var(--accent); color: var(--accent); font-weight: 600; }
   .table-wrap { display: none; padding: 0 24px 40px; max-width: 900px; margin: 0 auto; }
@@ -56,9 +57,6 @@
   thead { background: var(--surface2); }
   th { padding: 12px 16px; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; text-align: left; cursor: pointer; user-select: none; white-space: nowrap; }
   th:hover { color: var(--text); }
-  th.sorted { color: var(--accent); }
-  th .sort-arrow { margin-left: 4px; opacity: 0.5; }
-  th.sorted .sort-arrow { opacity: 1; }
   td { padding: 12px 16px; font-size: 13px; border-top: 1px solid var(--border); vertical-align: middle; }
   tr:hover td { background: rgba(255,255,255,0.02); }
   .rank { color: var(--muted); font-size: 12px; font-weight: 600; width: 36px; }
@@ -94,7 +92,8 @@
       <li><strong>「情報のダウンロードまたは移行」→「情報のダウンロード」</strong> を選択</li>
       <li>フォーマット: <code>JSON</code> を選択してリクエスト送信</li>
       <li>メールで届いたリンクからZIPをダウンロード・解凍</li>
-      <li><code>connections/followers_and_following/</code> フォルダ内の<br><code>followers_1.json</code> と <code>following.json</code> を下にアップロード</li>
+      <li><code>connections/followers_and_following/</code> フォルダ内の<br>
+          <code>followers_1.json</code>（複数ある場合は全部）と <code>following.json</code> をアップロード</li>
     </ol>
   </div>
   <div class="note">
@@ -104,10 +103,10 @@
   <div class="step-label">Step 2 — ファイルをアップロード</div>
   <div class="upload-grid">
     <div class="upload-box" id="followersBox">
-      <input type="file" id="followersFile" accept=".json">
+      <input type="file" id="followersFile" accept=".json" multiple>
       <div class="upload-icon">👥</div>
-      <h3>followers_1.json</h3>
-      <p>あなたをフォローしている人</p>
+      <h3>followers_*.json</h3>
+      <p>あなたをフォローしている人<br><small style="color:var(--muted)">複数ファイルを一括選択OK</small></p>
       <div class="loaded-info" id="followersInfo"></div>
     </div>
     <div class="upload-box" id="followingBox">
@@ -120,12 +119,26 @@
   </div>
   <button class="analyze-btn" id="analyzeBtn" disabled>分析する</button>
 </div>
+
 <div class="stats-bar" id="statsBar">
-  <div class="stat-card purple"><div class="num" id="statFollowing">—</div><div class="label">フォロー中</div></div>
-  <div class="stat-card green"><div class="num" id="statFollowers">—</div><div class="label">フォロワー</div></div>
-  <div class="stat-card red"><div class="num" id="statNotBack">—</div><div class="label">フォローバックなし</div></div>
-  <div class="stat-card blue"><div class="num" id="statOfficial">—</div><div class="label">公式マーク済み</div></div>
+  <div class="stat-card purple">
+    <div class="num" id="statFollowing">—</div>
+    <div class="label">フォロー中</div>
+  </div>
+  <div class="stat-card green">
+    <div class="num" id="statFollowers">—</div>
+    <div class="label">フォロワー</div>
+  </div>
+  <div class="stat-card red clickable" onclick="scrollToTable()">
+    <div class="num" id="statNotBack">—</div>
+    <div class="label">フォローバックなし ↓</div>
+  </div>
+  <div class="stat-card blue clickable" onclick="setFilter('official');scrollToTable()">
+    <div class="num" id="statOfficial">—</div>
+    <div class="label">公式マーク済み ↓</div>
+  </div>
 </div>
+
 <div class="toolbar" id="toolbar">
   <input type="text" id="searchInput" placeholder="ユーザー名で検索...">
   <select id="sortSelect">
@@ -139,52 +152,145 @@
   <button class="filter-btn" id="filterOfficial" onclick="setFilter('official')">公式のみ</button>
   <button class="filter-btn" id="filterNonOfficial" onclick="setFilter('non_official')">非公式のみ</button>
 </div>
+
 <div class="table-wrap" id="tableWrap">
   <div class="result-count" id="resultCount"></div>
   <table>
     <thead>
       <tr>
-        <th>#</th><th>アカウント</th>
-        <th onclick="toggleSort('followers')" id="thFollowers">フォロワー数 <span class="sort-arrow">↕</span></th>
-        <th>フォロー日</th><th>公式</th><th>プロフィール</th>
+        <th>#</th>
+        <th>アカウント</th>
+        <th onclick="toggleSort('followers')">フォロワー数 ↕</th>
+        <th>フォロー日</th>
+        <th>公式</th>
+        <th>プロフィール</th>
       </tr>
     </thead>
     <tbody id="tableBody"></tbody>
   </table>
 </div>
+
 <script>
 let followersData = null, followingData = null, results = [];
 let officialSet = new Set(), followerCounts = {};
 let currentFilter = 'all', sortKey = 'followers_desc';
 
-function setupUpload(inputId, boxId, infoId, label) {
-  const input = document.getElementById(inputId);
-  const box = document.getElementById(boxId);
-  const info = document.getElementById(infoId);
+function scrollToTable() {
+  const el = document.getElementById('tableWrap');
+  try { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+  catch(e) { window.scrollTo({ top: el.offsetTop - 16, behavior: 'smooth' }); }
+}
+
+function toUser(d) {
+  const name = d.value || d.username || d.name || '';
+  if (!name) return null;
+  return { username: name, href: d.href || ('https://www.instagram.com/' + name + '/'), timestamp: d.timestamp || 0 };
+}
+
+function extractUsers(arr) {
+  const out = [];
+  for (const item of arr) {
+    const list = item.string_list_data || item.stringListData || [];
+    if (list.length > 0) {
+      const nameFromTitle = item.title || '';
+      for (const d of list) {
+        const name = d.value || d.username || nameFromTitle || '';
+        if (!name) continue;
+        out.push({ username: name, href: d.href || ('https://www.instagram.com/' + name + '/'), timestamp: d.timestamp || 0 });
+      }
+      continue;
+    }
+    const u = toUser(item);
+    if (u) out.push(u);
+  }
+  return out;
+}
+
+function deepFindUsers(obj, depth) {
+  if (depth > 8) return [];
+  if (Array.isArray(obj)) {
+    if (!obj.length) return [];
+    const r = extractUsers(obj);
+    if (r.length > 0) return r;
+    for (const item of obj) { const r2 = deepFindUsers(item, depth+1); if (r2.length) return r2; }
+    return [];
+  }
+  if (obj && typeof obj === 'object') {
+    const priority = ['relationships_following','relationships_followers','relationships_follow_requests_sent'];
+    for (const k of priority) { if (obj[k]) { const r = deepFindUsers(obj[k], depth+1); if (r.length) return r; } }
+    for (const k of Object.keys(obj)) { if (priority.includes(k)) continue; const r = deepFindUsers(obj[k], depth+1); if (r.length) return r; }
+  }
+  return [];
+}
+
+function parseInstagramJSON(json) { return deepFindUsers(json, 0); }
+
+function checkReady() {
+  document.getElementById('analyzeBtn').disabled = !(followersData?.length > 0 && followingData?.length > 0);
+}
+
+// followers: 複数ファイル対応
+function setupFollowersUpload() {
+  const input = document.getElementById('followersFile');
+  const box = document.getElementById('followersBox');
+  const info = document.getElementById('followersInfo');
+
+  function processFiles(files) {
+    if (!files || !files.length) return;
+    const fileArr = Array.from(files);
+    let allUsers = [], done = 0;
+    fileArr.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = ev => {
+        try { allUsers = allUsers.concat(parseInstagramJSON(JSON.parse(ev.target.result))); } catch(e) {}
+        if (++done === fileArr.length) {
+          const seen = new Set();
+          allUsers = allUsers.filter(u => { if (seen.has(u.username)) return false; seen.add(u.username); return true; });
+          if (!allUsers.length) {
+            info.textContent = '⚠ 0件：ファイル形式を確認してください';
+            info.style.color = '#fcaf45'; box.classList.remove('loaded'); box.style.borderColor = '#fcaf45';
+            followersData = null;
+          } else {
+            followersData = allUsers;
+            info.textContent = `✓ ${allUsers.length}件 読み込み完了（${fileArr.length}ファイル）`;
+            info.style.color = ''; box.classList.add('loaded'); box.style.borderColor = '';
+          }
+          checkReady();
+        }
+      };
+      reader.readAsText(file);
+    });
+  }
+  input.addEventListener('change', e => processFiles(e.target.files));
+  box.addEventListener('dragover', e => { e.preventDefault(); box.classList.add('drag-over'); });
+  box.addEventListener('dragleave', () => box.classList.remove('drag-over'));
+  box.addEventListener('drop', e => { e.preventDefault(); box.classList.remove('drag-over'); processFiles(e.dataTransfer.files); });
+}
+
+// following: 1ファイル
+function setupFollowingUpload() {
+  const input = document.getElementById('followingFile');
+  const box = document.getElementById('followingBox');
+  const info = document.getElementById('followingInfo');
   input.addEventListener('change', e => {
-    const file = e.target.files[0];
-    if (!file) return;
+    const file = e.target.files[0]; if (!file) return;
     const reader = new FileReader();
     reader.onload = ev => {
       try {
-        const json = JSON.parse(ev.target.result);
-        const users = parseInstagramJSON(json, label);
-        if (users.length === 0) {
+        const users = parseInstagramJSON(JSON.parse(ev.target.result));
+        if (!users.length) {
           info.textContent = '⚠ 0件：ファイル形式を確認してください';
-          info.style.color = '#fcaf45';
-          box.classList.remove('loaded'); box.style.borderColor = '#fcaf45';
-          if (label === 'followers') followersData = null; else followingData = null;
+          info.style.color = '#fcaf45'; box.classList.remove('loaded'); box.style.borderColor = '#fcaf45';
+          followingData = null;
         } else {
-          if (label === 'followers') followersData = users; else followingData = users;
+          followingData = users;
           info.textContent = `✓ ${users.length}件 読み込み完了`;
           info.style.color = ''; box.classList.add('loaded'); box.style.borderColor = '';
         }
         checkReady();
       } catch(err) {
-        info.textContent = '× JSONとして読み込めません: ' + err.message;
-        info.style.color = '#ff6b6b'; box.classList.remove('loaded');
-        if (label === 'followers') followersData = null; else followingData = null;
-        checkReady();
+        info.textContent = '× JSONとして読み込めません'; info.style.color = '#ff6b6b';
+        followingData = null; checkReady();
       }
     };
     reader.readAsText(file);
@@ -198,61 +304,8 @@ function setupUpload(inputId, boxId, infoId, label) {
   });
 }
 
-function toUser(d) {
-  const name = d.value || d.username || d.name || '';
-  if (!name) return null;
-  return { username: name, href: d.href || ('https://www.instagram.com/' + name + '/'), timestamp: d.timestamp || d.time || 0 };
-}
-
-function extractUsers(arr) {
-  const results = [];
-  for (const item of arr) {
-    const list = item.string_list_data || item.stringListData || [];
-    if (list.length > 0) {
-      // title にユーザー名がある新形式: { title: "username", string_list_data: [{ href, timestamp }] }
-      const nameFromTitle = item.title || '';
-      for (const d of list) {
-        const name = d.value || d.username || nameFromTitle || '';
-        if (!name) continue;
-        results.push({
-          username: name,
-          href: d.href || ('https://www.instagram.com/' + name + '/'),
-          timestamp: d.timestamp || d.time || 0
-        });
-      }
-      continue;
-    }
-    const u = toUser(item);
-    if (u) results.push(u);
-  }
-  return results;
-}
-
-function deepFindUsers(obj, depth) {
-  if (depth > 8) return [];
-  if (Array.isArray(obj)) {
-    if (obj.length === 0) return [];
-    const r = extractUsers(obj);
-    if (r.length > 0) return r;
-    for (const item of obj) { const r2 = deepFindUsers(item, depth + 1); if (r2.length > 0) return r2; }
-    return [];
-  }
-  if (obj && typeof obj === 'object') {
-    const priority = ['relationships_following','relationships_followers','relationships_follow_requests_sent'];
-    for (const k of priority) { if (obj[k]) { const r = deepFindUsers(obj[k], depth+1); if (r.length > 0) return r; } }
-    for (const k of Object.keys(obj)) { if (priority.includes(k)) continue; const r = deepFindUsers(obj[k], depth+1); if (r.length > 0) return r; }
-  }
-  return [];
-}
-
-function parseInstagramJSON(json, type) { return deepFindUsers(json, 0); }
-
-function checkReady() {
-  document.getElementById('analyzeBtn').disabled = !(followersData?.length > 0 && followingData?.length > 0);
-}
-
-setupUpload('followersFile','followersBox','followersInfo','followers');
-setupUpload('followingFile','followingBox','followingInfo','following');
+setupFollowersUpload();
+setupFollowingUpload();
 document.getElementById('analyzeBtn').addEventListener('click', analyze);
 document.getElementById('searchInput').addEventListener('input', renderTable);
 document.getElementById('sortSelect').addEventListener('change', e => { sortKey = e.target.value; renderTable(); });
@@ -297,7 +350,7 @@ function onFollowerInput(username, val) {
 }
 function formatDate(ts) {
   if (!ts) return '—';
-  return new Date(ts*1000).toLocaleDateString('ja-JP',{year:'numeric',month:'short',day:'numeric'});
+  return new Date(ts*1000).toLocaleDateString('ja-JP', {year:'numeric', month:'short', day:'numeric'});
 }
 function renderTable() {
   const search = document.getElementById('searchInput').value.toLowerCase();
@@ -317,25 +370,25 @@ function renderTable() {
   });
   document.getElementById('resultCount').textContent = `${filtered.length} 件表示`;
   const tbody = document.getElementById('tableBody');
-  if (filtered.length===0) { tbody.innerHTML=`<tr><td colspan="6"><div class="empty"><div class="icon">🔍</div><p>該当するアカウントがありません</p></div></td></tr>`; return; }
+  if (!filtered.length) { tbody.innerHTML=`<tr><td colspan="6"><div class="empty"><div class="icon">🔍</div><p>該当するアカウントがありません</p></div></td></tr>`; return; }
   tbody.innerHTML = filtered.map((u,i) => {
     const isOff = officialSet.has(u.username);
     const fc = followerCounts[u.username];
     return `<tr>
       <td class="rank">${i+1}</td>
       <td><div class="user-cell"><div class="avatar">${u.username.charAt(0).toUpperCase()}</div><div>
-        <div class="username">${escapeHtml(u.username)}${isOff?' <span class="badge-official">公式</span>':''}</div>
+        <div class="username">${esc(u.username)}${isOff?' <span class="badge-official">公式</span>':''}</div>
         <div class="followed-date">${formatDate(u.timestamp)} からフォロー</div>
       </div></div></td>
-      <td><input class="followers-input" type="text" placeholder="例: 12000" value="${fc!==undefined&&fc>=0?fc:''}" oninput="onFollowerInput('${escapeAttr(u.username)}',this.value)"></td>
+      <td><input class="followers-input" type="text" placeholder="例: 12000" value="${fc!=null&&fc>=0?fc:''}" oninput="onFollowerInput('${escAttr(u.username)}',this.value)"></td>
       <td style="color:var(--muted);font-size:12px;">${formatDate(u.timestamp)}</td>
-      <td><button class="official-toggle ${isOff?'on':''}" onclick="toggleOfficial('${escapeAttr(u.username)}')" title="${isOff?'公式マークを外す':'公式としてマーク'}">✓</button></td>
-      <td><a href="${escapeHtml(u.href)}" target="_blank" rel="noopener" class="ig-link">開く</a></td>
+      <td><button class="official-toggle${isOff?' on':''}" onclick="toggleOfficial('${escAttr(u.username)}')" title="${isOff?'公式マークを外す':'公式としてマーク'}">✓</button></td>
+      <td><a href="${esc(u.href)}" target="_blank" rel="noopener" class="ig-link">開く</a></td>
     </tr>`;
   }).join('');
 }
-function escapeHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function escapeAttr(s) { return String(s).replace(/'/g,"\\'"); }
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function escAttr(s) { return String(s).replace(/'/g,"\\'"); }
 </script>
 </body>
 </html>
